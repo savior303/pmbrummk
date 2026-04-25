@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Muka & Tubuh Saya - Edisi Neraka</title>
+    <style>
+        body { text-align: center; font-family: 'Segoe UI', sans-serif; overflow: hidden; background-color: #1a0000; margin: 0; }
+        canvas { 
+            /* Background putih dihapus, diganti di dalam JS */
+            display: block; 
+            margin: 50px auto; 
+            border-bottom: 5px solid #ff4500; /* Warna border oranye api */
+            box-shadow: 0 10px 30px rgba(255, 69, 0, 0.3);
+        }
+        h1 { margin-top: 20px; color: #ff4500; text-shadow: 2px 2px 4px #000; }
+        p { color: #ccc; font-size: 1.1em; }
+        b { color: #ff4500; }
+    </style>
+</head>
+<body>
+    <h1>LARI DARI NERAKA, <span style="color:#ff6347;">Di Neraka!</span></h1>
+    <p>Tekan <b>SPASI</b> atau <b>KLIK/TAP</b> untuk lompat!</p>
+    <canvas id="gameCanvas" width="800" height="300"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        let skor = 0;
+        let gameRunning = true;
+
+        // --- MEMUAT GAMBAR-GAMBAR ---
+        // 1. Gambar Background Neraka (BARU)
+        const imgNeraka = new Image();
+        imgNeraka.src = 'neraka.jpg'; // Harus ada di folder
+
+        // 2. Gambar Wajah Kamu
+        const imgWajah = new Image();
+        imgWajah.src = 'pemain.jpg'; 
+
+        // 3. Gambar Tubuh Manusia
+        const imgTubuh = new Image();
+        imgTubuh.src = 'tubuh.png';
+
+        // 4. Gambar Rintangan Orang Jahat (Opsional)
+        const imgOrangJahat = new Image();
+        imgOrangJahat.src = 'orang_jahat.png';
+
+        // Indikator pemuatan gambar
+        let gambarDimuat = 0;
+        // Tambahkan imgNeraka ke daftar cek loading
+        [imgNeraka, imgWajah, imgTubuh, imgOrangJahat].forEach(img => {
+            img.onload = () => { gambarDimuat++; };
+            img.onerror = () => { 
+                if (img.src.includes('orang_jahat.png')) {
+                    // Abaikan jika musuh tidak ada
+                    return;
+                }
+                console.error("Gagal memuat gambar wajib: " + img.src); 
+            };
+        });
+
+        // --- PROPERTI ---
+        let pemain = { 
+            x: 80, // Geser sedikit ke kanan agar wajah lebih kelihatan
+            y: 220, 
+            lebarWajah: 55, // Sedikit diperbesar agar pas dengan tubuh
+            tinggiWajah: 55, 
+            lebarTubuh: 65, 
+            tinggiTubuh: 85,
+            tinggiTotal: 85,
+            dy: 0, 
+            gravitasi: 1.3, // Sedikit diperberat biar 'neraka' banget
+            kekuatanLompat: -23, 
+            diTanah: false 
+        };
+
+        let orangJahat = { 
+            x: 800, 
+            y: 230, 
+            lebar: 40, 
+            tinggi: 70, 
+            kecepatan: 7.5 // Sedikit lebih cepat
+        };
+
+        // --- INPUT HANDLING ---
+        function lompat() {
+            if (pemain.diTanah && gameRunning) {
+                pemain.dy = pemain.kekuatanLompat;
+                pemain.diTanah = false;
+            }
+        }
+        window.addEventListener("keydown", (e) => { if (e.code === "Space") { e.preventDefault(); lompat(); } });
+        canvas.addEventListener("mousedown", lompat);
+        canvas.addEventListener("touchstart", (e) => { e.preventDefault(); lompat(); });
+
+        // --- UPDATE & DRAW ---
+        function update() {
+            if (!gameRunning) return;
+            pemain.dy += pemain.gravitasi;
+            pemain.y += pemain.dy;
+            if (pemain.y + pemain.tinggiTotal > 300) {
+                pemain.y = 300 - pemain.tinggiTotal;
+                pemain.dy = 0;
+                pemain.diTanah = true;
+            }
+            orangJahat.x -= orangJahat.kecepatan;
+            if (orangJahat.x + orangJahat.lebar < 0) {
+                orangJahat.x = 800;
+                skor++;
+                orangJahat.kecepatan += 0.25; 
+            }
+            // Tabrakan
+            if (pemain.x < orangJahat.x + orangJahat.lebar && 
+                pemain.x + pemain.lebarTubuh > orangJahat.x &&
+                pemain.y < orangJahat.y + orangJahat.tinggi && 
+                pemain.y + pemain.tinggiTotal > orangJahat.y) {
+                gameRunning = false;
+                ctx.fillStyle = "rgba(255, 0, 0, 0.5)"; // Efek merah Game Over
+                ctx.fillRect(0,0, canvas.width, canvas.height);
+                setTimeout(() => {
+                    alert("GAME OVER DI NERAKA!\nSkor Akhir Kamu: " + skor);
+                    location.reload();
+                }, 100);
+            }
+        }
+
+        function draw() {
+            // A. Bersihkan Canvas & Gambar BACKGROUND (NERAKA)
+            // ctx.clearRect dihapus karena tertutup background image
+            if (gambarDimuat >= 1) { // Neraka adalah gambar pertama di src list
+                ctx.drawImage(imgNeraka, 0, 0, canvas.width, canvas.height);
+            } else {
+                // Cadangan: Background merah tua jika gambar gagal dimuat
+                ctx.fillStyle = "#300"; 
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            // B. Gambar Tanah Neraka (BARU: Pake Gradasi Api)
+            let gradTanah = ctx.createLinearGradient(0, 295, 0, 300);
+            gradTanah.addColorStop(0, "#ff4500"); // Oranye api
+            gradTanah.addColorStop(1, "#1a0000"); // Merah tua tanah
+            ctx.fillStyle = gradTanah;
+            ctx.fillRect(0, 295, canvas.width, 5);
+
+            // C. Gambar Pemain (Muka + Tubuh)
+            if (gambarDimuat >= 3) {
+                // Tubuh
+                ctx.drawImage(imgTubuh, pemain.x, pemain.y, pemain.lebarTubuh, pemain.tinggiTubuh);
+                // Wajah (pas di leher)
+                let offsetX = (pemain.lebarTubuh - pemain.lebarWajah) / 2;
+                let offsetY = -8; 
+                ctx.drawImage(imgWajah, pemain.x + offsetX, pemain.y + offsetY, pemain.lebarWajah, pemain.tinggiWajah);
+            }
+
+            // D. Gambar Rintangan (Orang Jahat / Kotak)
+            if (gambarDimuat >= 4) {
+                ctx.drawImage(imgOrangJahat, orangJahat.x, orangJahat.y, orangJahat.lebar, orangJahat.tinggi);
+            } else {
+                // Cadangan: Kotak oranye api
+                ctx.fillStyle = "#ff6347";
+                ctx.fillRect(orangJahat.x, orangJahat.y, orangJahat.lebar, orangJahat.tinggi);
+            }
+
+            // E. Gambar Skor (BARU: Gaya api)
+            ctx.fillStyle = "#ff4500";
+            ctx.font = "bold 26px 'Segoe UI', Arial";
+            ctx.textAlign = "right";
+            ctx.fillText("Skor API: " + skor, canvas.width - 30, 45);
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
+    </script>
+</body>
+</html>
